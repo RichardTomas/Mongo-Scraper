@@ -1,216 +1,181 @@
-/* global bootbox */
-$(document).ready(function() {
-  // Getting a reference to the article container div we will be rendering all articles inside of
-  var articleContainer = $(".article-container");
-  // Adding event listeners for dynamically generated buttons for deleting articles,
-  // pulling up article notes, saving article notes, and deleting article notes
-  $(document).on("click", ".btn.delete", handleArticleDelete);
-  $(document).on("click", ".btn.notes", handleArticleNotes);
-  $(document).on("click", ".btn.save", handleNoteSave);
-  $(document).on("click", ".btn.note-delete", handleNoteDelete);
+$(document).ready(function(){
+    
+    refreshData();
+    // Delete comment.
+    $("#commentsModal").on("click", ".delete-comment", function(event){
+        event.preventDefault();
 
-  // initPage kicks everything off when the page is loaded
-  initPage();
+        var articleId = $("#commentsModal").data("article-id");
+        var commentId = $(this).data("comment-id");
 
-  function initPage() {
-    // Empty the article container, run an AJAX request for any saved headlines
-    articleContainer.empty();
-    $.get("/api/headlines?saved=true").then(function(data) {
-      // If we have headlines, render them to the page
-      if (data && data.length) {
-        renderArticles(data);
-      }
-      else {
-        // Otherwise render a message explaing we have no articles
-        renderEmpty();
-      }
+        $.ajax({
+            url: "/api/comment/"+articleId+"/"+commentId,
+            method: "DELETE"
+        }).done(function(res){
+            var id = $("#commentsModal").data("article-id");
+            $.get("/api/article/"+id, function(response){
+                renderComments(response);
+            });
+        });
     });
-  }
 
-  function renderArticles(articles) {
-    // This function handles appending HTML containing our article data to the page
-    // We are passed an array of JSON containing all available articles in our database
-    var articlePanels = [];
-    // We pass each article JSON object to the createPanel function which returns a bootstrap
-    // panel with our article data inside
-    for (var i = 0; i < articles.length; i++) {
-      articlePanels.push(createPanel(articles[i]));
-    }
-    // Once we have all of the HTML for the articles stored in our articlePanels array,
-    // append them to the articlePanels container
-    articleContainer.append(articlePanels);
-  }
+    // Save comment.
+    $("#saveComment").on("click", function(event){
+        event.preventDefault();
 
-  function createPanel(article) {
-    // This functiont takes in a single JSON object for an article/headline
-    // It constructs a jQuery element containing all of the formatted HTML for the
-    // article panel
-    var panel = $(
-      [
-        "<div class='panel panel-default'>",
-        "<div class='panel-heading'>",
-        "<h3>",
-        "<a class='article-link' target='_blank' href='" + article.url + "'>",
-        article.headline,
-        "</a>",
-        "<a class='btn btn-danger delete'>",
-        "Delete From Saved",
-        "</a>",
-        "<a class='btn btn-info notes'>Article Notes</a>",
-        "</h3>",
-        "</div>",
-        "<div class='panel-body'>",
-        article.summary,
-        "</div>",
-        "</div>"
-      ].join("")
-    );
-    // We attach the article's id to the jQuery element
-    // We will use this when trying to figure out which article the user wants to remove or open notes for
-    panel.data("_id", article._id);
-    // We return the constructed panel jQuery element
-    return panel;
-  }
-
-  function renderEmpty() {
-    // This function renders some HTML to the page explaining we don't have any articles to view
-    // Using a joined array of HTML string data because it's easier to read/change than a concatenated string
-    var emptyAlert = $(
-      [
-        "<div class='alert alert-warning text-center'>",
-        "<h4>Uh Oh. Looks like we don't have any saved articles.</h4>",
-        "</div>",
-        "<div class='panel panel-default'>",
-        "<div class='panel-heading text-center'>",
-        "<h3>Would You Like to Browse Available Articles?</h3>",
-        "</div>",
-        "<div class='panel-body text-center'>",
-        "<h4><a href='/'>Browse Articles</a></h4>",
-        "</div>",
-        "</div>"
-      ].join("")
-    );
-    // Appending this data to the page
-    articleContainer.append(emptyAlert);
-  }
-
-  function renderNotesList(data) {
-    // This function handles rendering note list items to our notes modal
-    // Setting up an array of notes to render after finished
-    // Also setting up a currentNote variable to temporarily store each note
-    var notesToRender = [];
-    var currentNote;
-    if (!data.notes.length) {
-      // If we have no notes, just display a message explaing this
-      currentNote = ["<li class='list-group-item'>", "No notes for this article yet.", "</li>"].join("");
-      notesToRender.push(currentNote);
-    }
-    else {
-      // If we do have notes, go through each one
-      for (var i = 0; i < data.notes.length; i++) {
-        // Constructs an li element to contain our noteText and a delete button
-        currentNote = $(
-          [
-            "<li class='list-group-item note'>",
-            data.notes[i].noteText,
-            "<button class='btn btn-danger note-delete'>x</button>",
-            "</li>"
-          ].join("")
-        );
-        // Store the note id on the delete button for easy access when trying to delete
-        currentNote.children("button").data("_id", data.notes[i]._id);
-        // Adding our currentNote to the notesToRender array
-        notesToRender.push(currentNote);
-      }
-    }
-    // Now append the notesToRender to the note-container inside the note modal
-    $(".note-container").append(notesToRender);
-  }
-
-  function handleArticleDelete() {
-    // This function handles deleting articles/headlines
-    // We grab the id of the article to delete from the panel element the delete button sits inside
-    var articleToDelete = $(this).parents(".panel").data();
-    // Using a delete method here just to be semantic since we are deleting an article/headline
-    $.ajax({
-      method: "DELETE",
-      url: "/api/headlines/" + articleToDelete._id
-    }).then(function(data) {
-      // If this works out, run initPage again which will rerender our list of saved articles
-      if (data.ok) {
-        initPage();
-      }
+        var articleId = $("#commentsModal").data("article-id");
+        var newComment = $("#newComment").val();
+        var data = {
+            comment: newComment
+        };
+        
+        // Validation that user entered comments
+        if(newComment !== ""){
+            $("#commentsModal").modal("hide");
+            // Post the comment to db
+            $.post("/api/comment/"+articleId, data, function(response){
+                $("#newComment").val("");
+            });
+        } else{ 
+            alert("Please add a comment.");
+        }
     });
-  }
 
-  function handleArticleNotes() {
-    // This function handles opending the notes modal and displaying our notes
-    // We grab the id of the article to get notes for from the panel element the delete button sits inside
-    var currentArticle = $(this).parents(".panel").data();
-    // Grab any notes with this headline/article id
-    $.get("/api/notes/" + currentArticle._id).then(function(data) {
-      // Constructing our initial HTML to add to the notes modal
-      var modalText = [
-        "<div class='container-fluid text-center'>",
-        "<h4>Notes For Article: ",
-        currentArticle._id,
-        "</h4>",
-        "<hr />",
-        "<ul class='list-group note-container'>",
-        "</ul>",
-        "<textarea placeholder='New Note' rows='4' cols='60'></textarea>",
-        "<button class='btn btn-success save'>Save Note</button>",
-        "</div>"
-      ].join("");
-      // Adding the formatted HTML to the note modal
-      bootbox.dialog({
-        message: modalText,
-        closeButton: true
-      });
-      var noteData = {
-        _id: currentArticle._id,
-        notes: data || []
-      };
-      // Adding some information about the article and article notes to the save button for easy access
-      // When trying to add a new note
-      $(".btn.save").data("article", noteData);
-      // renderNotesList will populate the actual note HTML inside of the modal we just created/opened
-      renderNotesList(noteData);
+    // View comments
+    $("#newsArea").on("click", ".view-comments", function(event){
+        event.preventDefault();
+
+        var articleId = $(this).data("article-id");
+        $("#commentsModal").data("article-id", articleId);
+
+        // Get comments from db
+        $.get("/api/article/"+articleId, function(response){
+            renderComments(response);
+        });
     });
-  }
 
-  function handleNoteSave() {
-    // This function handles what happens when a user tries to save a new note for an article
-    // Setting a variable to hold some formatted data about our note,
-    // grabbing the note typed into the input box
-    var noteData;
-    var newNote = $(".bootbox-body textarea").val().trim();
-    // If we actually have data typed into the note input field, format it
-    // and post it to the "/api/notes" route and send the formatted noteData as well
-    if (newNote) {
-      noteData = {
-        _id: $(this).data("article")._id,
-        noteText: newNote
-      };
-      $.post("/api/notes", noteData).then(function() {
-        // When complete, close the modal
-        bootbox.hideAll();
-      });
-    }
-  }
+    // Delete comment
+    $("#newsArea").on("click", ".delete", function(event){
+        event.preventDefault();
 
-  function handleNoteDelete() {
-    // This function handles the deletion of notes
-    // First we grab the id of the note we want to delete
-    // We stored this data on the delete button when we created it
-    var noteToDelete = $(this).data("_id");
-    // Perform an DELETE request to "/api/notes/" with the id of the note we're deleting as a parameter
-    $.ajax({
-      url: "/api/notes/" + noteToDelete,
-      method: "DELETE"
-    }).then(function() {
-      // When done, hide the modal
-      bootbox.hideAll();
+        var articleId = $(this).data("article-id");
+
+        // Delete from db
+        $.ajax({
+            url: "/api/remove/article/"+articleId,
+            method: "PUT"
+        }).done(function(response){
+
+            refreshData();
+        });
     });
-  }
 });
+
+function refreshData(){
+
+    // Get all articles
+    $.get("/api/articles/true", function(response){
+        $("#newsArea").empty();
+        renderArticles(response);
+    });
+}
+
+// Build each comment div and render on the modal.
+function renderComments(commentsResponse){
+
+    var commentsArea = $("#commentsArea");
+    $("#commentsArea").empty();
+
+    if(commentsResponse === undefined || commentsResponse.length <= 0 ||
+       commentsResponse.comments === undefined ||
+       commentsResponse.comments.length <= 0){
+
+        var div = $("<div>");
+        div.addClass("border border-primary m-2 p-1 mx-auto");
+        div.text("No comments yet.");
+        commentsArea.append(div);
+    } else{
+
+        for(var i=0; i < commentsResponse.comments.length; i++){
+            var div = $("<div>");
+            div.addClass("border border-primary m-2 p-1 mx-auto");
+            div.text(commentsResponse.comments[i].body);
+            var button = $("<button type='button'>");
+            button.addClass("close delete-comment");
+            button.css("line-height", "20px");
+            button.data("comment-id", commentsResponse.comments[i]._id);
+            button.html("<span aria-hidden='true'>&times;</span>");
+            div.append(button);
+            commentsArea.append(div);
+        }
+    }
+}
+
+// Create cards for each article
+function renderArticles(articles){
+
+    for(var i=0; i < articles.length; i++){
+
+        var card = $("<div class='card border-dark mb-4'>");
+        var header = $("<div class='card-header'>");
+        var body = $("<div class='card-body'>");
+
+        var commentsButton = $("<button type='button'>");
+        commentsButton.text("Article Comments");
+        commentsButton.data("article-id", articles[i]._id);
+        commentsButton.attr("data-toggle", "modal");
+        commentsButton.attr("data-target", "#commentsModal");
+        commentsButton.addClass("btn btn-secondary m-2 view-comments");
+        commentsButton.css("float", "right");
+
+        var deleteButton = $("<button type='button'>");
+        deleteButton.text("Delete From Saved");
+        deleteButton.data("article-id", articles[i]._id);
+        deleteButton.addClass("btn btn-danger m-2 delete");
+        deleteButton.css("float", "right");
+
+        var nytLink = $("<a>");
+        nytLink.attr("href", articles[i].link);
+        nytLink.attr("target", "_blank");
+        nytLink.append("<h3 class='card-title'>"+articles[i].heading+"</h3>");
+
+        body.append(nytLink);
+        body.append("<p class='card-text'>"+articles[i].summary+"</p>");
+        body.append(deleteButton);
+        body.append(commentsButton);
+        card.append(header);
+        card.append(body);
+
+        $("#newsArea").prepend(card);
+    }
+
+    // Display a warning if no articles exist.
+    // Otherwise remove the warning.
+    if( $("#newsArea").children(".card").length === 0 ){
+        renderEmpty();
+    } else{
+        removeEmpty();
+    }
+
+}
+
+// Display a warning if no articles exist.
+function renderEmpty(){
+
+    if( $("#newsArea").children("#no-articles-warning").length === 0 ){
+        var div = $("<div class='alert alert-warning' role='alert'>");
+        div.text("No artciles have been saved!");
+        div.attr("id", "no-articles-warning");
+        $("#newsArea").prepend(div);
+    }
+
+}
+
+// Remove the no articles warning.
+function removeEmpty(){
+
+    if( $("#newsArea").children("#no-articles-warning").length > 0 ){
+        $("#no-articles-warning").remove();
+    }
+
+}
