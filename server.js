@@ -1,38 +1,40 @@
-const express    = require("express");
+const express = require("express");
+const mongoose = require("mongoose");
+const exphbs = require("express-handlebars");
 const bodyParser = require("body-parser");
-const exphbs     = require("express-handlebars");
-const mongoose   = require("mongoose");
-const port       = process.env.PORT || 3000 ;
-//const morgan     = require("morgan");
+
+// Set port
+const PORT = process.env.PORT || 3000;
+
+// Initialize Express
 const app = express();
-// Enable logging.
-//app.use(morgan('combined'));
-// Require all models
-const db = require("./models");
-// Database configuration
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/mongoHeadlines";
 
-mongoose.Promise = Promise;
-mongoose.connect(MONGODB_URI);
+// Routes
+const routes = require("./routes");
 
-// Public directory.
-app.use(express.static(__dirname + '/public'));
+// Use public folders
+app.use(express.static("public"));
 
-// Set up Body Parser.
-app.use(bodyParser.urlencoded({
-  extended: false
-}));
-app.use(bodyParser.json());
-
-// Set up Handlebars.
+// Handlebars engine
 app.engine("handlebars", exphbs({ defaultLayout: "main" }));
 app.set("view engine", "handlebars");
 
-// Create routes.
-require("./routes/html-routes.js")(app, db);
-require("./routes/api-routes.js")(app, mongoose, db);
+// Body Parser
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+// Use routes
+app.use(routes);
+
+// If deployed, use the deployed database. Otherwise use the local mongoHeadlines database
+var MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost/mongoHeadlines";
+
+// Set mongoose to leverage built in JavaScript ES6 Promises
+// Connect to the Mongo DB
+mongoose.Promise = Promise;
+mongoose.connect(MONGODB_URI);
 
 // Start the server
-app.listen(port, function(){
-    console.log("App running on port " + port);
+app.listen(PORT, function() {
+  console.log("App running on port " + PORT + "!");
 });
